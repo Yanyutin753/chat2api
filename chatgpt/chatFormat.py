@@ -232,6 +232,7 @@ async def stream_response(service, response, model, max_tokens):
 async def api_messages_to_chat(service, api_messages, ori_model_name):
     file_tokens = 0
     chat_messages = []
+    contains_url = False
     enable_search_models = 'gpt-3.5' not in ori_model_name and 'claude-3' not in ori_model_name
     if 'gpt-4o' in ori_model_name:
         api_enable_search = enable_search and enable_gpt4o_search
@@ -310,13 +311,14 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
                 "attachments": attachments
             }
 
-        # gpt-3.5-turbo和gpt-4-o 不允许搜索
-        elif not api_enable_search and not contains_url:
+        # 当模型为3.5或者claude 或者 文本不包含url的时候，直接请求
+        elif not api_enable_search or not contains_url:
             content_type = "text"
             parts = [content]
             metadata = {}
 
         else:
+            metadata = {}
             parts = []
             attachments = []
             tem_urls = []
@@ -358,10 +360,12 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
                             "name": file_name,
                             "mime_type": mime_type,
                         })
-            metadata = {
-                "attachments": attachments
-            }
+
             if attachments:
+                metadata = {
+                    "attachments": attachments
+                }
+                # 删除content里的url，防止影响信息
                 content = reduce(lambda text, url: text.replace(url, ''), tem_urls, content).strip()
             parts.append(content)
 

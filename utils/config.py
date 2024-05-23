@@ -37,6 +37,9 @@ max_file_num = os.getenv('MAX_FILE_NUM', 5)
 enable_gpt4o_search = is_true(os.getenv('ENABLE_GPT4O_SEARCH', False))
 enable_all_chat_search = is_true(os.getenv('ENABLE_ALL_CHAT_SEARCH', False))
 
+enable_search = is_true(os.getenv('ENABLE_SEARCH', False))
+max_file_num = os.getenv('MAX_FILE_NUM', 5)
+enable_gpt4o_search = is_true(os.getenv('ENABLE_GPT4O_SEARCH', False))
 authorization_list = authorization.split(',') if authorization else []
 chatgpt_base_url_list = chatgpt_base_url.split(',') if chatgpt_base_url else []
 arkose_token_url_list = arkose_token_url.split(',') if arkose_token_url else []
