@@ -259,7 +259,7 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
         # 将列表转换为字典
         final_positions = dict(url_positions)
 
-    for index, api_message in api_messages:
+    for index, api_message in enumerate(api_messages):
         role = api_message.get('role')
         content = api_message.get('content')
         if isinstance(content, list):
