@@ -319,15 +319,15 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
         else:
             parts = []
             attachments = []
+            tem_urls = []
             content_type = "multimodal_text"
             all_urls = final_positions.get(i, [])
-            if all_urls:
-                logger.info(f"第{i + 1}条消息里的包含的{len(all_urls)}条URL为: {all_urls}")
-            # 处理普通的文件URL
+
             for url in all_urls:
                 file_content, mime_type = await get_file_content(url)
                 file_meta = await service.upload_file(file_content, mime_type)
                 if file_meta:
+                    tem_urls.append(url)
                     file_id = file_meta["file_id"]
                     file_size = file_meta["size_bytes"]
                     file_name = file_meta["file_name"]
@@ -361,7 +361,8 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
             metadata = {
                 "attachments": attachments
             }
-            content = reduce(lambda text, url: text.replace(url, ''), all_urls, content).strip()
+            if attachments:
+                content = reduce(lambda text, url: text.replace(url, ''), tem_urls, content).strip()
             parts.append(content)
 
         chat_message = {
