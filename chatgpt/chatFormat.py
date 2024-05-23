@@ -334,7 +334,7 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
                     mime_type = file_meta["mime_type"]
                     if mime_type.startswith("image/"):
                         width, height = file_meta["width"], file_meta["height"]
-                        file_tokens += await calculate_image_tokens(width, height, detail)
+                        file_tokens += await calculate_image_tokens(width, height, "auto")
                         parts.append({
                             "content_type": "image_asset_pointer",
                             "asset_pointer": f"file-service://{file_id}",
