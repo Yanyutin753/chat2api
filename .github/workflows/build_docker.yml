@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - tem-main
     paths-ignore:
       - 'README.md'
       - 'docker-compose.yml'
