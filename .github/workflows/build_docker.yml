@@ -37,8 +37,8 @@ jobs:
         with:
           images: yangclivia/chat2api
           tags: |
-            type=raw,value=latest
-            type=raw,value=v1.1.8
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=v1.1.9
 
       - name: Build and push
         uses: docker/build-push-action@v5
