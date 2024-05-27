@@ -17,7 +17,7 @@ from utils.Client import Client
 from utils.Logger import logger
 from utils.authorization import verify_token
 from utils.config import proxy_url_list, chatgpt_base_url_list, arkose_token_url_list, history_disabled, pow_difficulty, \
-    conversation_only, enable_limit, limit_status_code
+    conversation_only, enable_limit, limit_status_code, check_model, auth_key
 
 
 class ChatService:
@@ -65,8 +65,20 @@ class ChatService:
         self.history_disabled = data.get('history_disabled', history_disabled)
 
         self.data = data
+
         self.origin_model = self.data.get("model", "gpt-3.5-turbo-0125")
-        self.target_model = model_proxy.get(self.origin_model, self.origin_model)
+        self.resp_model = model_proxy.get(self.origin_model, self.origin_model)
+        if "gpt-4o" in self.origin_model:
+            self.req_model = "gpt-4o"
+        elif "gpt-4-mobile" in self.origin_model:
+            self.req_model = "gpt-4-mobile"
+        elif "gpt-4-gizmo" in self.origin_model:
+            self.req_model = "gpt-4o"
+        elif "gpt-4" in self.origin_model:
+            self.req_model = "gpt-4"
+        else:
+            self.req_model = "text-davinci-002-render-sha"
+
         self.api_messages = self.data.get("messages", [])
         self.prompt_tokens = 0
         self.max_tokens = self.data.get("max_tokens", 2147483647)
@@ -102,8 +114,12 @@ class ChatService:
         else:
             self.base_url = self.host_url + "/backend-anon"
 
+        if auth_key:
+            self.base_headers['authkey'] = auth_key
+
         await get_dpl(self)
-        self.s.session.cookies.set("__Secure-next-auth.callback-url", "https%3A%2F%2Fchatgpt.com;", domain=self.host_url.split("://")[1], secure=True)
+        self.s.session.cookies.set("__Secure-next-auth.callback-url", "https%3A%2F%2Fchatgpt.com;",
+                                   domain=self.host_url.split("://")[1], secure=True)
 
     async def get_wss_url(self):
         url = f'{self.base_url}/register-websocket'
@@ -131,15 +147,33 @@ class ChatService:
             r = await self.s.post(url, headers=headers, json=data, timeout=5)
             if r.status_code == 200:
                 resp = r.json()
-                self.persona = resp.get("persona")
-                if "gpt-4" in self.origin_model and self.persona != "chatgpt-paid":
-                    if "gpt-4o" not in self.origin_model and "gpt-4-gizmo" not in self.origin_model:
-                        raise HTTPException(status_code=404, detail={
-                            "message": f"The model `{self.origin_model}` does not exist or you do not have access to it.",
-                            "type": "invalid_request_error",
-                            "param": None,
-                            "code": "model_not_found"
-                        })
+
+                if check_model:
+                    r = await self.s.get(f'{self.base_url}/models', headers=headers, timeout=5)
+                    if r.status_code == 200:
+                        models = r.json().get('models')
+                        if not any(self.req_model in model.get("slug", "") for model in models):
+                            logger.error(f"Model {self.req_model} not support.")
+                            raise HTTPException(status_code=404, detail={
+                                "message": f"The model `{self.origin_model}` does not exist or you do not have access to it.",
+                                "type": "invalid_request_error",
+                                "param": None,
+                                "code": "model_not_found"
+                            })
+                    else:
+                        raise HTTPException(status_code=404, detail="Failed to get models")
+                else:
+                    self.persona = resp.get("persona")
+                    if self.persona != "chatgpt-paid":
+                        if self.req_model == "gpt-4":
+                            logger.error(f"Model {self.resp_model} not support for {self.persona}")
+                            raise HTTPException(status_code=404, detail={
+                                "message": f"The model `{self.origin_model}` does not exist or you do not have access to it.",
+                                "type": "invalid_request_error",
+                                "param": None,
+                                "code": "model_not_found"
+                            })
+
                 arkose = resp.get('arkose', {})
                 proofofwork = resp.get('proofofwork', {})
                 turnstile = resp.get('turnstile', {})
@@ -148,9 +182,11 @@ class ChatService:
                 if proofofwork_required:
                     proofofwork_diff = proofofwork.get("difficulty")
                     if proofofwork_diff <= pow_difficulty:
-                        raise HTTPException(status_code=403, detail=f"Proof of work difficulty too high: {proofofwork_diff}")
+                        raise HTTPException(status_code=403,
+                                            detail=f"Proof of work difficulty too high: {proofofwork_diff}")
                     proofofwork_seed = proofofwork.get("seed")
-                    self.proof_token, solved = await run_in_threadpool(get_answer_token, proofofwork_seed, proofofwork_diff, config)
+                    self.proof_token, solved = await run_in_threadpool(get_answer_token, proofofwork_seed,
+                                                                       proofofwork_diff, config)
                     if not solved:
                         raise HTTPException(status_code=403, detail="Failed to solve proof of work")
 
@@ -219,25 +255,18 @@ class ChatService:
             self.chat_headers.pop('Openai-Sentinel-Proof-Token', None)
             self.chat_headers.pop('Openai-Sentinel-Arkose-Token', None)
 
-        conversation_mode = {"kind": "primary_assistant"}
-        if "gpt-4o" in self.origin_model:
-            model = "gpt-4o"
-        elif "gpt-4-mobile" in self.origin_model:
-            model = "gpt-4-mobile"
-        elif "gpt-4-gizmo" in self.origin_model:
-            model = "gpt-4o"
-            gizmo_id = self.data.get("model").split("gpt-4-gizmo-")[-1]
+        if "gpt-4-gizmo" in self.origin_model:
+            gizmo_id = self.origin_model.split("gpt-4-gizmo-")[-1]
             conversation_mode = {"kind": "gizmo_interaction", "gizmo_id": gizmo_id}
-        elif "gpt-4" in self.origin_model:
-            model = "gpt-4"
         else:
-            model = "text-davinci-002-render-sha"
-        logger.info(f"Model mapping: {self.origin_model} -> {model}")
+            conversation_mode = {"kind": "primary_assistant"}
+
+        logger.info(f"Model mapping: {self.origin_model} -> {self.req_model}")
         self.chat_request = {
             "action": "next",
             "messages": chat_messages,
             "parent_message_id": self.parent_message_id if self.parent_message_id else f"{uuid.uuid4()}",
-            "model": model,
+            "model": self.req_model,
             "timezone_offset_min": -480,
             "suggestions": [],
             "history_and_training_disabled": self.history_disabled,
@@ -266,7 +295,8 @@ class ChatService:
                 raise HTTPException(status_code=e.status_code, detail=str(e))
             url = f'{self.base_url}/conversation'
             stream = self.data.get("stream", False)
-            r = await self.s.post_stream(url, headers=self.chat_headers, json=self.chat_request, timeout=10, stream=True)
+            r = await self.s.post_stream(url, headers=self.chat_headers, json=self.chat_request, timeout=10,
+                                         stream=True)
             if r.status_code != 200:
                 rtext = await r.atext()
                 if "application/json" == r.headers.get("Content-Type", ""):
@@ -283,9 +313,11 @@ class ChatService:
 
             content_type = r.headers.get("Content-Type", "")
             if "text/event-stream" in content_type and stream:
-                return stream_response(self, r.aiter_lines(), self.target_model, self.max_tokens)
+                return stream_response(self, r.aiter_lines(), self.resp_model, self.max_tokens)
             elif "text/event-stream" in content_type and not stream:
-                return await format_not_stream_response(stream_response(self, r.aiter_lines(), self.target_model, self.max_tokens), self.prompt_tokens, self.max_tokens, self.target_model)
+                return await format_not_stream_response(
+                    stream_response(self, r.aiter_lines(), self.resp_model, self.max_tokens), self.prompt_tokens,
+                    self.max_tokens, self.resp_model)
             elif "application/json" in content_type:
                 rtext = await r.atext()
                 resp = json.loads(rtext)
@@ -298,9 +330,11 @@ class ChatService:
                 wss_r = wss_stream_response(self.ws, conversation_id)
                 try:
                     if stream and isinstance(wss_r, types.AsyncGeneratorType):
-                        return stream_response(self, wss_r, self.target_model, self.max_tokens)
+                        return stream_response(self, wss_r, self.resp_model, self.max_tokens)
                     else:
-                        return await format_not_stream_response(stream_response(self, wss_r, self.target_model, self.max_tokens), self.prompt_tokens, self.max_tokens, self.target_model)
+                        return await format_not_stream_response(
+                            stream_response(self, wss_r, self.resp_model, self.max_tokens), self.prompt_tokens,
+                            self.max_tokens, self.resp_model)
                 finally:
                     if not isinstance(wss_r, types.AsyncGeneratorType):
                         await self.ws.close()
