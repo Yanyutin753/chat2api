@@ -35,7 +35,7 @@ refresh_server = os.getenv('RFRESH_SERVER', 'oai')
 check_model = is_true(os.getenv('CHECK_MODEL', False))
 
 enable_search = is_true(os.getenv('ENABLE_SEARCH', False))
-max_file_num = os.getenv('MAX_FILE_NUM', 5)
+max_file_num = int(os.getenv('MAX_FILE_NUM', 5))
 enable_gpt4o_search = is_true(os.getenv('ENABLE_GPT4O_SEARCH', False))
 authorization_list = authorization.split(',') if authorization else []
 chatgpt_base_url_list = chatgpt_base_url.split(',') if chatgpt_base_url else []
@@ -49,7 +49,7 @@ logger.info("Environment variables:")
 logger.info("API_PREFIX:            " + str(api_prefix))
 logger.info("AUTHORIZATION:         " + str(authorization_list))
 logger.info("CHATGPT_BASE_URL:      " + str(chatgpt_base_url_list))
-logger.info("AUTH_KEY:          " + str(auth_key))
+logger.info("AUTH_KEY:              " + str(auth_key))
 logger.info("ARKOSE_TOKEN_URL:      " + str(arkose_token_url_list))
 logger.info("PROXY_URL:             " + str(proxy_url_list))
 logger.info("HISTORY_DISABLED:      " + str(history_disabled))

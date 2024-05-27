@@ -1,7 +1,6 @@
 import asyncio
 import json
 import random
-import re
 import string
 import time
 import uuid
@@ -266,7 +265,7 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
 
         for i, message in enumerate(api_messages):
             content = message.get("content", "")
-            role = message.get("role","assistant")
+            role = message.get("role", "assistant")
             if not isinstance(content, list) and role not in ["assistant", "system"]:
                 urls = extractor.find_urls(str(content), True)
                 urls = [url for url in urls if url.startswith(('https', 'http'))][:max_file_num]
