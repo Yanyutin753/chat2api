@@ -10,8 +10,7 @@ services:
     volumes:
       - ./data:/app/data # 挂载一些需要保存的数据
     environment:
-      - TZ=Asia/Shanghai # 设置时区
-      - ARKOSE_TOKEN_URL=http://arkose:5006/token # 已内置，不要改动
+      - ARKOSE_TOKEN_URL=http://arkose:5006/token
 
   arkose:
     image: lanqian528/funcaptcha_solver:latest
@@ -19,5 +18,3 @@ services:
     restart: unless-stopped
     ports:
       - '5006:5006'
-    environment:
-      - TZ=Asia/Shanghai # 设置时区

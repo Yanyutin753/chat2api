@@ -81,13 +81,6 @@ async def wss_stream_response(websocket, conversation_id):
                 data = resultObj.get("data", {})
                 if conversation_id != data.get("conversation_id", ""):
                     continue
-                sequenceId = resultObj.get('sequenceId')
-                if sequenceId and sequenceId % 80 == 0:
-                    await websocket.send(
-                        json.dumps(
-                            {"type": "sequenceAck", "sequenceId": sequenceId}
-                        )
-                    )
                 decoded_bytes = pybase64.b64decode(data.get("body", None))
                 yield decoded_bytes
             else:
@@ -98,7 +91,6 @@ async def wss_stream_response(websocket, conversation_id):
         except websockets.ConnectionClosed as e:
             if e.code == 1000:
                 logger.error("WebSocket closed normally with code 1000 (OK)")
-                yield b"data: [DONE]\n\n"
             else:
                 logger.error(f"WebSocket closed with error code {e.code}")
         except Exception as e:
@@ -398,6 +390,6 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
             "metadata": metadata
         }
         chat_messages.append(chat_message)
-    text_tokens = await num_tokens_from_messages(api_messages, service.resp_model)
+    text_tokens = await num_tokens_from_messages(api_messages, service.target_model)
     prompt_tokens = text_tokens + file_tokens
     return chat_messages, prompt_tokens
