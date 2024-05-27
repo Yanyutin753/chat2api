@@ -29,7 +29,6 @@ class ChatService:
         self.ws = None
 
     async def set_dynamic_data(self, data):
-        req_len = None
         if req_len:
             req_len = len(self.req_token.split(","))
             if req_len == 1:
