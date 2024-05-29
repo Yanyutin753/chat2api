@@ -286,7 +286,6 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
     for index, api_message in enumerate(api_messages):
         role = api_message.get('role')
         content = api_message.get('content')
-
         if isinstance(content, list):
             parts = []
             attachments = []
@@ -294,7 +293,7 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
             for i in content:
                 if i.get("type") == "text":
                     parts.append(i.get("text"))
-                if i.get("type") == "image_url":
+                elif i.get("type") == "image_url":
                     image_url = i.get("image_url")
                     url = image_url.get("url")
                     detail = image_url.get("detail", "auto")
