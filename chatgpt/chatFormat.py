@@ -15,9 +15,11 @@ from api.files import get_file_content
 from api.models import model_system_fingerprint
 from api.tokens import split_tokens_from_content, calculate_image_tokens, num_tokens_from_messages
 from utils.Logger import logger
-from utils.config import max_file_num, enable_search, enable_gpt4o_search
+from utils.config import max_file_num, enable_search, enable_gpt4o_search, enable_search_prefix
 
-moderation_message = "I'm sorry, I cannot provide or engage in any content related to pornography, violence, or any unethical material. If you have any other questions or need assistance, please feel free to let me know. I'll do my best to provide support and assistance."
+moderation_message = ("I'm sorry, I cannot provide or engage in any content related to pornography, violence, "
+                      "or any unethical material. If you have any other questions or need assistance, please feel "
+                      "free to let me know. I'll do my best to provide support and assistance.")
 
 
 async def format_not_stream_response(response, prompt_tokens, max_tokens, model):
@@ -266,7 +268,8 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
         for i, message in enumerate(api_messages):
             content = message.get("content", "")
             role = message.get("role", "assistant")
-            if not isinstance(content, list) and role not in ["assistant", "system"]:
+            is_search = str(content).strip().startswith(enable_search_prefix) and role not in ["assistant", "system"]
+            if not isinstance(content, list) and is_search:
                 urls = extractor.find_urls(str(content), True)
                 urls = [url for url in urls if url.startswith(('https', 'http'))][:max_file_num]
                 message["content"] = content.strip()

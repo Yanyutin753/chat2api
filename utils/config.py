@@ -37,6 +37,7 @@ check_model = is_true(os.getenv('CHECK_MODEL', False))
 enable_search = is_true(os.getenv('ENABLE_SEARCH', False))
 max_file_num = int(os.getenv('MAX_FILE_NUM', 5))
 enable_gpt4o_search = is_true(os.getenv('ENABLE_GPT4O_SEARCH', False))
+enable_search_prefix = os.getenv('ENABLE_SEARCH_PREFIX', 'http')
 authorization_list = authorization.split(',') if authorization else []
 chatgpt_base_url_list = chatgpt_base_url.split(',') if chatgpt_base_url else []
 arkose_token_url_list = arkose_token_url.split(',') if arkose_token_url else []
@@ -61,6 +62,8 @@ logger.info("ENABLE_LIMIT:          " + str(enable_limit))
 logger.info("LIMIT_STATUS_CODE      " + str(limit_status_code))
 logger.info("RFRESH_SERVER:         " + str(refresh_server))
 logger.info("ENABLE_SEARCH:         " + str(enable_search))
-logger.info("MAX_FILE_NUM:         " + str(max_file_num))
+logger.info("MAX_FILE_NUM:          " + str(max_file_num))
 logger.info("ENABLE_GPT4O_SEARCH:   " + str(enable_gpt4o_search))
+logger.info("ENABLE_SEARCH_PREFIX:  " + str(enable_search_prefix))
+
 logger.info("-" * 60)
