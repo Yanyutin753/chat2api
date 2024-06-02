@@ -3,6 +3,7 @@ import types
 import warnings
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from chatgpt.chatLimit import clean_dict
 from fastapi import FastAPI, Request, Depends, HTTPException, Form
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
@@ -36,8 +37,9 @@ app.add_middleware(
 
 @app.on_event("startup")
 async def app_start():
-    scheduler.add_job(id='refresh', func=refresh_all_tokens, trigger='cron', hour=3, minute=0, day='*/4')
     scheduler.start()
+    scheduler.add_job(id='refresh', func=refresh_all_tokens, trigger='cron', hour=3, minute=0, day='*/4')
+    scheduler.add_job(id='updateLimit_run', func=clean_dict, trigger='cron', hour=3, minute=0, day='*/3')
     asyncio.get_event_loop().call_later(0, lambda: asyncio.create_task(refresh_all_tokens()))
 
 
