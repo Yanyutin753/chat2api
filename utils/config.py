@@ -35,6 +35,7 @@ enable_limit = is_true(os.getenv('ENABLE_LIMIT', True))
 limit_status_code = os.getenv('LIMIT_STATUS_CODE', 429)
 refresh_server = os.getenv('REFRESH_SERVER', 'oai')
 check_model = is_true(os.getenv('CHECK_MODEL', False))
+scheduled_refresh = is_true(os.getenv('SCHEDULED_REFRESH', True))
 
 enable_search = is_true(os.getenv('ENABLE_SEARCH', False))
 max_file_num = int(os.getenv('MAX_FILE_NUM', 5))
@@ -46,7 +47,7 @@ arkose_token_url_list = arkose_token_url.split(',') if arkose_token_url else []
 proxy_url_list = proxy_url.split(',') if proxy_url else []
 
 logger.info("-" * 60)
-logger.info("Chat2Api v1.2.0 | https://github.com/lanqian528/chat2api")
+logger.info("Chat2Api v1.2.2 | https://github.com/lanqian528/chat2api")
 logger.info("-" * 60)
 logger.info("Environment variables:")
 logger.info("API_PREFIX:            " + str(api_prefix))
@@ -69,4 +70,5 @@ logger.info("MAX_FILE_NUM:          " + str(max_file_num))
 logger.info("ENABLE_GPT4O_SEARCH:   " + str(enable_gpt4o_search))
 logger.info("ENABLE_SEARCH_PREFIX:  " + str(enable_search_prefix))
 logger.info("CHECK_MODEL:           " + str(check_model))
+logger.info("SCHEDULED_REFRESH:     " + str(scheduled_refresh))
 logger.info("-" * 60)
