@@ -6,7 +6,7 @@ from fastapi import HTTPException
 
 from utils.Client import Client
 from utils.Logger import logger
-from utils.config import proxy_url_list
+from utils.config import proxy_url_list, refresh_server
 import chatgpt.globals as globals
 
 

@@ -33,7 +33,7 @@ enable_gateway = is_true(os.getenv('ENABLE_GATEWAY', True))
 conversation_only = is_true(os.getenv('CONVERSATION_ONLY', False))
 enable_limit = is_true(os.getenv('ENABLE_LIMIT', True))
 limit_status_code = os.getenv('LIMIT_STATUS_CODE', 429)
-refresh_server = os.getenv('REFRESH_SERVER', 'oai')
+refresh_server = os.getenv('REFRESH_SERVER', 'oaifree')
 check_model = is_true(os.getenv('CHECK_MODEL', False))
 scheduled_refresh = is_true(os.getenv('SCHEDULED_REFRESH', True))
 
