@@ -82,4 +82,7 @@ logger.info("ENABLE_GPT4O_SEARCH:   " + str(enable_gpt4o_search))
 logger.info("ENABLE_SEARCH_PREFIX:  " + str(enable_search_prefix))
 logger.info("CHECK_MODEL:           " + str(check_model))
 logger.info("SCHEDULED_REFRESH:     " + str(scheduled_refresh))
+logger.info("ENABLE_SYSTEM_PROMPT:  " + str(enable_system_prompt))
+if system_prompt:
+    logger.info("SYSTEM_PROMPT:         " + str(system_prompt))
 logger.info("-" * 60)

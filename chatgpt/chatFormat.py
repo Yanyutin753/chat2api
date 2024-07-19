@@ -292,6 +292,7 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
             "role": "system",
             "content": system_prompt.format(model=ori_model_name, time=time.strftime("%Y-%m-%d %H:%M:%S"))
         })
+        logger.info("成功注入系统提示信息！")
     if 'gpt-4o' in ori_model_name and 'gpt-4o-mini' not in ori_model_name:
         api_enable_search = enable_search and enable_gpt4o_search
     else:
