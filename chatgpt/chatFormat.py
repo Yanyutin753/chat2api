@@ -285,7 +285,7 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
     chat_messages = []
     contains_url = False
     enable_search_models = 'gpt-3.5' not in ori_model_name and 'claude-3' not in ori_model_name
-    if 'gpt-4o' in ori_model_name:
+    if 'gpt-4o' in ori_model_name and 'gpt-4o-mini' not in ori_model_name:
         api_enable_search = enable_search and enable_gpt4o_search
     else:
         api_enable_search = enable_search and enable_search_models
