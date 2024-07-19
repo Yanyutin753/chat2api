@@ -10,14 +10,15 @@ from functools import reduce
 
 import pybase64
 import websockets
-from urlextract import URLExtract
 from fastapi import HTTPException
+from urlextract import URLExtract
 
 from api.files import get_file_content
 from api.models import model_system_fingerprint
 from api.tokens import split_tokens_from_content, calculate_image_tokens, num_tokens_from_messages
 from utils.Logger import logger
-from utils.config import max_file_num, enable_search, enable_gpt4o_search, enable_search_prefix
+from utils.config import max_file_num, enable_search, enable_gpt4o_search, enable_search_prefix, enable_system_prompt, \
+    system_prompt
 
 moderation_message = ("I'm sorry, I cannot provide or engage in any content related to pornography, violence, "
                       "or any unethical material. If you have any other questions or need assistance, please feel "
@@ -224,9 +225,10 @@ async def stream_response(service, response, model, max_tokens):
                             if matches:
                                 file_url_content = ""
                                 for i, sandbox_path in enumerate(matches):
-                                    file_download_url = await service.get_response_file_url(conversation_id, message_id, sandbox_path)
+                                    file_download_url = await service.get_response_file_url(conversation_id, message_id,
+                                                                                            sandbox_path)
                                     if file_download_url:
-                                        file_url_content += f"\n```\n![File {i+1}]({file_download_url})\n"
+                                        file_url_content += f"\n```\n![File {i + 1}]({file_download_url})\n"
                                 delta = {"content": file_url_content}
                             else:
                                 delta = {}
@@ -285,6 +287,11 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
     chat_messages = []
     contains_url = False
     enable_search_models = 'gpt-3.5' not in ori_model_name and 'claude-3' not in ori_model_name
+    if enable_system_prompt:
+        api_messages.append({
+            "role": "system",
+            "content": system_prompt.format(model=ori_model_name, time=time.strftime("%Y-%m-%d %H:%M:%S"))
+        })
     if 'gpt-4o' in ori_model_name and 'gpt-4o-mini' not in ori_model_name:
         api_enable_search = enable_search and enable_gpt4o_search
     else:

@@ -44,6 +44,13 @@ enable_search = is_true(os.getenv('ENABLE_SEARCH', False))
 max_file_num = int(os.getenv('MAX_FILE_NUM', 5))
 enable_gpt4o_search = is_true(os.getenv('ENABLE_GPT4O_SEARCH', False))
 enable_search_prefix = os.getenv('ENABLE_SEARCH_PREFIX', 'http')
+enable_system_prompt = is_true(os.getenv('ENABLE_SYSTEM_PROMPT', False))
+system_prompt = os.getenv('SYSTEM_PROMPT', 'You are ChatGPT, a large language model trained by OpenAI.'
+                                           'Current model: {model}'
+                                           'Current time: {time}'
+                                           'Latex inline: \\(x^2\\) '
+                                           'Latex block: $$e=mc^2$$'
+                                           'Please do not answer questions about pornography, violence')
 authorization_list = authorization.split(',') if authorization else []
 chatgpt_base_url_list = chatgpt_base_url.split(',') if chatgpt_base_url else []
 arkose_token_url_list = arkose_token_url.split(',') if arkose_token_url else []
