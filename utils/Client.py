@@ -1,3 +1,4 @@
+import logging
 import random
 
 from curl_cffi.requests import AsyncSession
@@ -24,6 +25,9 @@ class Client:
             headers = headers or self.session.headers
             cookies = cookies or self.session.cookies
         r = await self.session2.post(*args, headers=headers, cookies=cookies, impersonate=self.impersonate, **kwargs)
+        logging.info(f"post_stream: {r.status_code}")
+        if r.status_code != 200:
+            raise Exception(f"Stream response not supported {r.status_code}")
         return r
 
     async def get(self, *args, **kwargs):
