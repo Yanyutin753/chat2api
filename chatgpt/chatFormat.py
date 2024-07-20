@@ -277,8 +277,8 @@ async def stream_response(service, response, model, max_tokens):
                 if chunk.startswith("data: "):
                     chunk_data = json.loads(chunk[6:])
                     if chunk_data.get("error"):
-                        error = f"Error: {chunk_data.get('error')}"
-                        yield f"data: {error})\n\n"
+                        error = f"{chunk_data.get('error')}"
+                        yield f"data: {error}\n\n"
                         yield "data: [DONE]\n\n"
                         break
                 logger.error(f"Error: {chunk}, details: {str(e)}")
