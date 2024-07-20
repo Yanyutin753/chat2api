@@ -278,7 +278,7 @@ async def stream_response(service, response, model, max_tokens):
                     chunk_data = json.loads(chunk[6:])
                     if chunk_data.get("error"):
                         error = f"Error: {chunk_data.get('error')}"
-                        yield f"data: 500 Internal Server Error: {error})\n\n"
+                        yield f"data: {error})\n\n"
                         yield "data: [DONE]\n\n"
                         break
                 logger.error(f"Error: {chunk}, details: {str(e)}")
