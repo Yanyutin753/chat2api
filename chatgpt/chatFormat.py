@@ -126,162 +126,166 @@ async def stream_response(service, response, model, max_tokens):
     start = False
     end = False
 
-    async for chunk in response:
-        chunk = chunk.decode("utf-8")
-        # chunk = 'data: {"message": null, "conversation_id": "38b8bfcf-9912-45db-a48e-b62fb585c855", "error": "Our systems have detected unusual activity coming from your system. Please try again later."}'
-        if end:
-            yield "data: [DONE]\n\n"
-            break
-        try:
-            if chunk.startswith("data: {"):
-                chunk_old_data = json.loads(chunk[6:])
-                finish_reason = None
-                message = chunk_old_data.get("message", {})
-                role = message.get('author', {}).get('role')
-                if role == 'user' or role == 'system':
-                    continue
+    try:
+        async for chunk in response:
+            chunk = chunk.decode("utf-8")
+            # chunk = 'data: {"message": null, "conversation_id": "38b8bfcf-9912-45db-a48e-b62fb585c855", "error": "Our systems have detected unusual activity coming from your system. Please try again later."}'
+            if end:
+                yield "data: [DONE]\n\n"
+                break
 
-                status = message.get("status")
-                if start:
-                    pass
-                elif status == "in_progress":
-                    start = True
-                else:
-                    continue
+            try:
+                if chunk.startswith("data: {"):
+                    chunk_old_data = json.loads(chunk[6:])
+                    finish_reason = None
+                    message = chunk_old_data.get("message", {})
+                    role = message.get('author', {}).get('role')
+                    if role == 'user' or role == 'system':
+                        continue
 
-                conversation_id = chunk_old_data.get("conversation_id")
-                message_id = message.get("id")
-                content = message.get("content", {})
-                recipient = message.get("recipient", "")
-
-                if not message and chunk_old_data.get("type") == "moderation":
-                    delta = {"role": "assistant", "content": moderation_message}
-                    finish_reason = "stop"
-                    end = True
-                elif status == "in_progress":
-                    outer_content_type = content.get("content_type")
-                    if outer_content_type == "text":
-                        part = content.get("parts", [])[0]
-                        if not part:
-                            new_text = ""
-                        else:
-                            if last_message_id and last_message_id != message_id:
-                                continue
-                            citation = message.get("metadata", {}).get("citations", [])
-                            if len(citation) > len_last_citation:
-                                inside_metadata = citation[-1].get("metadata", {})
-                                citation_title = inside_metadata.get("title", "")
-                                citation_url = inside_metadata.get("url", "")
-                                new_text = f' **[[""]]({citation_url} "{citation_title}")** '
-                                len_last_citation = len(citation)
-                            else:
-                                new_text = part[len_last_content:]
-                            len_last_content = len(part)
+                    status = message.get("status")
+                    if start:
+                        pass
+                    elif status == "in_progress":
+                        start = True
                     else:
-                        text = content.get("text", "")
-                        if outer_content_type == "code" and last_content_type != "code":
-                            new_text = "\n```" + recipient + "\n" + text[len_last_content:]
-                        elif outer_content_type == "execution_output" and last_content_type != "execution_output":
-                            new_text = "\n```" + "Output" + "\n" + text[len_last_content:]
-                        else:
-                            new_text = text[len_last_content:]
-                        len_last_content = len(text)
-                    if last_content_type == "code" and outer_content_type != "code":
-                        new_text = "\n```\n" + new_text
-                    elif last_content_type == "execution_output" and outer_content_type != "execution_output":
-                        new_text = "\n```\n" + new_text
-                    if recipient == "dalle.text2im" and last_recipient != "dalle.text2im":
-                        new_text = "\n```" + "json" + "\n" + new_text
-                    delta = {"content": new_text}
-                    last_content_type = outer_content_type
-                    last_recipient = recipient
-                    if completion_tokens >= max_tokens:
-                        delta = {}
-                        finish_reason = "length"
-                        end = True
-                elif status == "finished_successfully":
-                    if content.get("content_type") == "multimodal_text":
-                        parts = content.get("parts", [])
-                        delta = {}
-                        for part in parts:
-                            if isinstance(part, str):
-                                continue
-                            inner_content_type = part.get('content_type')
-                            if inner_content_type == "image_asset_pointer":
-                                last_content_type = "image_asset_pointer"
-                                file_id = part.get('asset_pointer').replace('file-service://', '')
-                                logger.debug(f"file_id: {file_id}")
-                                image_download_url = await service.get_download_url(file_id)
-                                logger.debug(f"image_download_url: {image_download_url}")
-                                if image_download_url:
-                                    delta = {"content": f"\n```\n![image]({image_download_url})\n"}
-                                else:
-                                    delta = {"content": f"\n```\nFailed to load the image.\n"}
-                    elif message.get("end_turn"):
-                        part = content.get("parts", [])[0]
-                        new_text = part[len_last_content:]
-                        if not new_text:
-                            matches = re.findall(r'\(sandbox:(.*?)\)', part)
-                            if matches:
-                                file_url_content = ""
-                                for i, sandbox_path in enumerate(matches):
-                                    file_download_url = await service.get_response_file_url(conversation_id, message_id,
-                                                                                            sandbox_path)
-                                    if file_download_url:
-                                        file_url_content += f"\n```\n![File {i + 1}]({file_download_url})\n"
-                                delta = {"content": file_url_content}
-                            else:
-                                delta = {}
-                        else:
-                            delta = {"content": new_text}
+                        continue
+
+                    conversation_id = chunk_old_data.get("conversation_id")
+                    message_id = message.get("id")
+                    content = message.get("content", {})
+                    recipient = message.get("recipient", "")
+
+                    if not message and chunk_old_data.get("type") == "moderation":
+                        delta = {"role": "assistant", "content": moderation_message}
                         finish_reason = "stop"
                         end = True
+                    elif status == "in_progress":
+                        outer_content_type = content.get("content_type")
+                        if outer_content_type == "text":
+                            part = content.get("parts", [])[0]
+                            if not part:
+                                new_text = ""
+                            else:
+                                if last_message_id and last_message_id != message_id:
+                                    continue
+                                citation = message.get("metadata", {}).get("citations", [])
+                                if len(citation) > len_last_citation:
+                                    inside_metadata = citation[-1].get("metadata", {})
+                                    citation_title = inside_metadata.get("title", "")
+                                    citation_url = inside_metadata.get("url", "")
+                                    new_text = f' **[[""]]({citation_url} "{citation_title}")** '
+                                    len_last_citation = len(citation)
+                                else:
+                                    new_text = part[len_last_content:]
+                                len_last_content = len(part)
+                        else:
+                            text = content.get("text", "")
+                            if outer_content_type == "code" and last_content_type != "code":
+                                new_text = "\n```" + recipient + "\n" + text[len_last_content:]
+                            elif outer_content_type == "execution_output" and last_content_type != "execution_output":
+                                new_text = "\n```" + "Output" + "\n" + text[len_last_content:]
+                            else:
+                                new_text = text[len_last_content:]
+                            len_last_content = len(text)
+                        if last_content_type == "code" and outer_content_type != "code":
+                            new_text = "\n```\n" + new_text
+                        elif last_content_type == "execution_output" and outer_content_type != "execution_output":
+                            new_text = "\n```\n" + new_text
+                        if recipient == "dalle.text2im" and last_recipient != "dalle.text2im":
+                            new_text = "\n```" + "json" + "\n" + new_text
+                        delta = {"content": new_text}
+                        last_content_type = outer_content_type
+                        last_recipient = recipient
+                        if completion_tokens >= max_tokens:
+                            delta = {}
+                            finish_reason = "length"
+                            end = True
+                    elif status == "finished_successfully":
+                        if content.get("content_type") == "multimodal_text":
+                            parts = content.get("parts", [])
+                            delta = {}
+                            for part in parts:
+                                if isinstance(part, str):
+                                    continue
+                                inner_content_type = part.get('content_type')
+                                if inner_content_type == "image_asset_pointer":
+                                    last_content_type = "image_asset_pointer"
+                                    file_id = part.get('asset_pointer').replace('file-service://', '')
+                                    logger.debug(f"file_id: {file_id}")
+                                    image_download_url = await service.get_download_url(file_id)
+                                    logger.debug(f"image_download_url: {image_download_url}")
+                                    if image_download_url:
+                                        delta = {"content": f"\n```\n![image]({image_download_url})\n"}
+                                    else:
+                                        delta = {"content": f"\n```\nFailed to load the image.\n"}
+                        elif message.get("end_turn"):
+                            part = content.get("parts", [])[0]
+                            new_text = part[len_last_content:]
+                            if not new_text:
+                                matches = re.findall(r'\(sandbox:(.*?)\)', part)
+                                if matches:
+                                    file_url_content = ""
+                                    for i, sandbox_path in enumerate(matches):
+                                        file_download_url = await service.get_response_file_url(conversation_id, message_id,
+                                                                                                sandbox_path)
+                                        if file_download_url:
+                                            file_url_content += f"\n```\n![File {i + 1}]({file_download_url})\n"
+                                    delta = {"content": file_url_content}
+                                else:
+                                    delta = {}
+                            else:
+                                delta = {"content": new_text}
+                            finish_reason = "stop"
+                            end = True
+                        else:
+                            last_message_id = None
+                            len_last_content = 0
+                            continue
                     else:
-                        last_message_id = None
-                        len_last_content = 0
                         continue
+                    last_message_id = message_id
+                    if not end and not delta.get("content"):
+                        delta = {"role": "assistant", "content": ""}
+                    chunk_new_data = {
+                        "id": chat_id,
+                        "object": "chat.completion.chunk",
+                        "created": created_time,
+                        "model": model,
+                        "choices": [
+                            {
+                                "index": 0,
+                                "delta": delta,
+                                "logprobs": None,
+                                "finish_reason": finish_reason
+                            }
+                        ],
+                        "system_fingerprint": system_fingerprint
+                    }
+                    if not service.history_disabled:
+                        chunk_new_data.update({
+                            "message_id": message_id,
+                            "conversation_id": conversation_id,
+                        })
+                    completion_tokens += 1
+                    yield f"data: {json.dumps(chunk_new_data)}\n\n"
+                elif chunk.startswith("data: [DONE]"):
+                    yield "data: [DONE]\n\n"
                 else:
                     continue
-                last_message_id = message_id
-                if not end and not delta.get("content"):
-                    delta = {"role": "assistant", "content": ""}
-                chunk_new_data = {
-                    "id": chat_id,
-                    "object": "chat.completion.chunk",
-                    "created": created_time,
-                    "model": model,
-                    "choices": [
-                        {
-                            "index": 0,
-                            "delta": delta,
-                            "logprobs": None,
-                            "finish_reason": finish_reason
-                        }
-                    ],
-                    "system_fingerprint": system_fingerprint
-                }
-                if not service.history_disabled:
-                    chunk_new_data.update({
-                        "message_id": message_id,
-                        "conversation_id": conversation_id,
-                    })
-                completion_tokens += 1
-                yield f"data: {json.dumps(chunk_new_data)}\n\n"
-            elif chunk.startswith("data: [DONE]"):
-                yield "data: [DONE]\n\n"
-            else:
+            except Exception as e:
+                if chunk.startswith("data: "):
+                    chunk_data = json.loads(chunk[6:])
+                    if chunk_data.get("error"):
+                        error = f"Error: {chunk_data.get('error')}"
+                        yield f"data: 500 Internal Server Error: {error})\n\n"
+                        yield "data: [DONE]\n\n"
+                        break
+                logger.error(f"Error: {chunk}, details: {str(e)}")
                 continue
-        except Exception as e:
-            if chunk.startswith("data: "):
-                chunk_data = json.loads(chunk[6:])
-                if chunk_data.get("error"):
-                    error = f"Error: {chunk_data.get('error')}"
-                    logger.error(error)
-                    yield f"data:{error})\n\n"
-                    yield "data: [DONE]\n\n"
-                    break
-            logger.error(f"Error: {chunk}, details: {str(e)}")
-            continue
+    except Exception as e:
+        logger.error(f"Server error, {str(e)}")
+        raise Exception("Server error")
 
 
 async def api_messages_to_chat(service, api_messages, ori_model_name):

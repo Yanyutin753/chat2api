@@ -338,9 +338,14 @@ class ChatService:
                 raise HTTPException(status_code=r.status_code, detail=detail)
 
             content_type = r.headers.get("Content-Type", "")
+            logger.info(f"Content-Type: {content_type}")
+            logger.info(r.headers)
             if "text/event-stream" in content_type and stream:
                 await set_wss(self.req_token, False)
-                return stream_response(self, r.aiter_lines(), self.resp_model, self.max_tokens)
+                try:
+                    return stream_response(self, r.aiter_lines(), self.resp_model, self.max_tokens)
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=str(e))
             elif "text/event-stream" in content_type and not stream:
                 await set_wss(self.req_token, False)
                 return await format_not_stream_response(
