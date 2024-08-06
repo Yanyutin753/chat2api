@@ -9,3 +9,4 @@ pybase64
 jinja2
 APScheduler
 urlextract
+python-multipart
