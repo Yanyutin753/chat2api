@@ -292,10 +292,29 @@ async def stream_response(service, response, model, max_tokens):
                 if chunk.startswith("data: "):
                     chunk_data = json.loads(chunk[6:])
                     if chunk_data.get("error"):
+                        error = f"{chunk_data.get('error')}"
+                        delta = {"role": "assistant", "content": error + "（服务端请求失败，请重新请求或者更换模型再试吧！）"}
+                        chunk_new_data = {
+                            "id": chat_id,
+                            "object": "chat.completion.chunk",
+                            "created": created_time,
+                            "model": model,
+                            "choices": [
+                                {
+                                    "index": 0,
+                                    "delta": delta,
+                                    "logprobs": None,
+                                    "finish_reason": finish_reason
+                                }
+                            ],
+                            "system_fingerprint": system_fingerprint
+                        }
                         logger.error(f"Error: {chunk_data.get('error')}")
+                        yield f"data: {json.dumps(chunk_new_data)}\n\n"
                         yield "data: [DONE]\n\n"
                         break
-                logger.error(f"Error: {chunk}, details: {str(e)}")
+                else:
+                    logger.error(f"Error: {chunk}, details: {str(e)}")
                 continue
     except Exception as e:
         logger.error(f"Server error, {str(e)}")
