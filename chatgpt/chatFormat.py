@@ -57,7 +57,8 @@ async def format_not_stream_response(response, prompt_tokens, max_tokens, model)
     }
     if not message.get("content"):
         raise HTTPException(status_code=403, detail="No content in the message.")
-    return {
+
+    data = {
         "id": chat_id,
         "object": "chat.completion",
         "created": created_time,
@@ -70,9 +71,11 @@ async def format_not_stream_response(response, prompt_tokens, max_tokens, model)
                 "finish_reason": finish_reason
             }
         ],
-        "usage": usage,
-        "system_fingerprint": system_fingerprint
+        "usage": usage
     }
+    if system_fingerprint:
+        data["system_fingerprint"] = system_fingerprint
+    return data
 
 
 async def wss_stream_response(websocket, conversation_id):
@@ -112,46 +115,72 @@ async def wss_stream_response(websocket, conversation_id):
             continue
 
 
+async def head_process_response(response):
+    async for chunk in response:
+        chunk = chunk.decode("utf-8")
+        if chunk.startswith("data: {"):
+            chunk_old_data = json.loads(chunk[6:])
+            message = chunk_old_data.get("message", {})
+            if not message and "error" in chunk_old_data:
+                return response, False
+            role = message.get('author', {}).get('role')
+            if role == 'user' or role == 'system':
+                continue
+
+            status = message.get("status")
+            if status == "in_progress":
+                return response, True
+    return response, False
+
+
 async def stream_response(service, response, model, max_tokens):
     chat_id = f"chatcmpl-{''.join(random.choice(string.ascii_letters + string.digits) for _ in range(29))}"
     system_fingerprint_list = model_system_fingerprint.get(model, None)
     system_fingerprint = random.choice(system_fingerprint_list) if system_fingerprint_list else None
     created_time = int(time.time())
-    completion_tokens = -1
+    completion_tokens = 0
     len_last_content = 0
     len_last_citation = 0
     last_message_id = None
     last_content_type = None
     last_recipient = None
-    start = False
     end = False
+
+    chunk_new_data = {
+        "id": chat_id,
+        "object": "chat.completion.chunk",
+        "created": created_time,
+        "model": model,
+        "choices": [
+            {
+                "index": 0,
+                "delta": {"role": "assistant", "content": ""},
+                "logprobs": None,
+                "finish_reason": None
+            }
+        ]
+    }
+    if system_fingerprint:
+        chunk_new_data["system_fingerprint"] = system_fingerprint
+    yield f"data: {json.dumps(chunk_new_data)}\n\n"
 
     try:
         async for chunk in response:
             chunk = chunk.decode("utf-8")
-            # chunk = 'data: {"message": null, "conversation_id": "38b8bfcf-9912-45db-a48e-b62fb585c855", "error": "Our systems have detected unusual activity coming from your system. Please try again later."}'
             if end:
                 yield "data: [DONE]\n\n"
                 break
-
             try:
                 if chunk.startswith("data: {"):
                     chunk_old_data = json.loads(chunk[6:])
                     finish_reason = None
                     message = chunk_old_data.get("message", {})
+                    conversation_id = chunk_old_data.get("conversation_id")
                     role = message.get('author', {}).get('role')
                     if role == 'user' or role == 'system':
                         continue
 
                     status = message.get("status")
-                    if start:
-                        pass
-                    elif status == "in_progress":
-                        start = True
-                    else:
-                        continue
-
-                    conversation_id = chunk_old_data.get("conversation_id")
                     message_id = message.get("id")
                     content = message.get("content", {})
                     recipient = message.get("recipient", "")
@@ -227,10 +256,9 @@ async def stream_response(service, response, model, max_tokens):
                                 if matches:
                                     file_url_content = ""
                                     for i, sandbox_path in enumerate(matches):
-                                        file_download_url = await service.get_response_file_url(conversation_id, message_id,
-                                                                                                sandbox_path)
+                                        file_download_url = await service.get_response_file_url(conversation_id, message_id, sandbox_path)
                                         if file_download_url:
-                                            file_url_content += f"\n```\n![File {i + 1}]({file_download_url})\n"
+                                            file_url_content += f"\n```\n![File {i+1}]({file_download_url})\n"
                                     delta = {"content": file_url_content}
                                 else:
                                     delta = {}
@@ -247,21 +275,8 @@ async def stream_response(service, response, model, max_tokens):
                     last_message_id = message_id
                     if not end and not delta.get("content"):
                         delta = {"role": "assistant", "content": ""}
-                    chunk_new_data = {
-                        "id": chat_id,
-                        "object": "chat.completion.chunk",
-                        "created": created_time,
-                        "model": model,
-                        "choices": [
-                            {
-                                "index": 0,
-                                "delta": delta,
-                                "logprobs": None,
-                                "finish_reason": finish_reason
-                            }
-                        ],
-                        "system_fingerprint": system_fingerprint
-                    }
+                    chunk_new_data["choices"][0]["delta"] = delta
+                    chunk_new_data["choices"][0]["finish_reason"] = finish_reason
                     if not service.history_disabled:
                         chunk_new_data.update({
                             "message_id": message_id,
@@ -277,24 +292,7 @@ async def stream_response(service, response, model, max_tokens):
                 if chunk.startswith("data: "):
                     chunk_data = json.loads(chunk[6:])
                     if chunk_data.get("error"):
-                        error = f"{chunk_data.get('error')}"
-                        delta = {"role": "assistant", "content": error}
-                        chunk_new_data = {
-                            "id": chat_id,
-                            "object": "chat.completion.chunk",
-                            "created": created_time,
-                            "model": model,
-                            "choices": [
-                                {
-                                    "index": 0,
-                                    "delta": delta,
-                                    "logprobs": None,
-                                    "finish_reason": finish_reason
-                                }
-                            ],
-                            "system_fingerprint": system_fingerprint
-                        }
-                        yield f"data: {json.dumps(chunk_new_data)}\n\n"
+                        logger.error(f"Error: {chunk_data.get('error')}")
                         yield "data: [DONE]\n\n"
                         break
                 logger.error(f"Error: {chunk}, details: {str(e)}")

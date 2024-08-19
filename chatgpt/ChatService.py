@@ -1,25 +1,21 @@
 import asyncio
 import json
 import random
-import types
 import uuid
 
-import websockets
 from fastapi import HTTPException
 from starlette.concurrency import run_in_threadpool
 
 from api.files import get_image_size, get_file_extension, determine_file_use_case
 from api.models import model_proxy
 from chatgpt.authorization import get_req_token, verify_token
-from chatgpt.chatFormat import api_messages_to_chat, stream_response, wss_stream_response, format_not_stream_response
+from chatgpt.chatFormat import api_messages_to_chat, stream_response, format_not_stream_response, head_process_response
 from chatgpt.chatLimit import check_is_limit, handle_request_limit
 from chatgpt.proofofWork import get_config, get_dpl, get_answer_token, get_requirements_token
 from chatgpt.turnstile import process_turnstile
-from chatgpt.wssClient import token2wss, set_wss
 from utils.Client import Client
 from utils.Logger import logger
-from utils.config import proxy_url_list, chatgpt_base_url_list, arkose_token_url_list, history_disabled, pow_difficulty, \
-    conversation_only, enable_limit, limit_status_code, check_model, auth_key, user_agents_list
+from utils.config import proxy_url_list, chatgpt_base_url_list, ark0se_token_url_list, history_disabled, pow_difficulty, conversation_only, enable_limit, limit_status_code, check_model, auth_key, user_agents_list
 
 
 class ChatService:
@@ -65,19 +61,13 @@ class ChatService:
 
         self.proxy_url = random.choice(proxy_url_list) if proxy_url_list else None
         self.host_url = random.choice(chatgpt_base_url_list) if chatgpt_base_url_list else "https://chatgpt.com"
-        self.arkose_token_url = random.choice(arkose_token_url_list) if arkose_token_url_list else None
+        self.ark0se_token_url = random.choice(ark0se_token_url_list) if ark0se_token_url_list else None
 
         self.s = Client(proxy=self.proxy_url)
-        self.ws = None
-        if conversation_only:
-            self.wss_mode = False
-            self.wss_url = None
-        else:
-            self.wss_mode, self.wss_url = await token2wss(self.req_token)
 
         self.oai_device_id = str(uuid.uuid4())
         self.persona = None
-        self.arkose_token = None
+        self.ark0se_token = None
         self.proof_token = None
         self.turnstile_token = None
 
@@ -130,23 +120,12 @@ class ChatService:
             self.req_model = "gpt-4o"
         elif "gpt-4" in self.origin_model:
             self.req_model = "gpt-4"
-        else:
+        elif "gpt-3.5" in self.origin_model:
             self.req_model = "text-davinci-002-render-sha"
-
-    async def get_wss_url(self):
-        url = f'{self.base_url}/register-websocket'
-        headers = self.base_headers.copy()
-        r = await self.s.post(url, headers=headers, data='', timeout=5)
-        try:
-            if r.status_code == 200:
-                resp = r.json()
-                logger.info(f'register-websocket response:{resp}')
-                wss_url = resp.get('wss_url')
-                return wss_url
-            raise Exception(r.text)
-        except Exception as e:
-            logger.error(f"get_wss_url error: {str(e)}")
-            raise HTTPException(status_code=r.status_code, detail=f"Failed to get wss url: {str(e)}")
+        elif "auto" in self.origin_model:
+            self.req_model = "auto"
+        else:
+            self.req_model = "auto"
 
     async def get_chat_requirements(self):
         if conversation_only:
@@ -197,29 +176,32 @@ class ChatService:
                         logger.info(f"Turnstile ignored: {e}")
                     # raise HTTPException(status_code=403, detail="Turnstile required")
 
-                arkose = resp.get('arkose', {})
-                arkose_required = arkose.get('required')
-                if arkose_required and self.persona != "chatgpt-freeaccount":
-                    # logger.info("Arkose required: ignore")
-                    if not self.arkose_token_url:
-                        raise HTTPException(status_code=403, detail="Arkose service required")
-                    arkose_dx = arkose.get("dx")
-                    arkose_client = Client()
+                ark0se = resp.get('ark' + 'ose', {})
+                ark0se_required = ark0se.get('required')
+                if ark0se_required:
+                    if self.persona == "chatgpt-freeaccount":
+                        ark0se_method = "chat35"
+                    else:
+                        ark0se_method = "chat4"
+                    if not self.ark0se_token_url:
+                        raise HTTPException(status_code=403, detail="Ark0se service required")
+                    ark0se_dx = ark0se.get("dx")
+                    ark0se_client = Client()
                     try:
-                        r2 = await arkose_client.post(
-                            url=self.arkose_token_url,
-                            json={"blob": arkose_dx},
+                        r2 = await ark0se_client.post(
+                            url=self.ark0se_token_url,
+                            json={"blob": ark0se_dx, "method": ark0se_method},
                             timeout=15
                         )
                         r2esp = r2.json()
-                        logger.info(f"arkose_token: {r2esp}")
-                        self.arkose_token = r2esp.get('token')
-                        if not self.arkose_token:
-                            raise HTTPException(status_code=403, detail="Failed to get Arkose token")
+                        logger.info(f"ark0se_token: {r2esp}")
+                        self.ark0se_token = r2esp.get('token')
+                        if not self.ark0se_token:
+                            raise HTTPException(status_code=403, detail="Failed to get Ark0se token")
                     except Exception:
-                        raise HTTPException(status_code=403, detail="Failed to get Arkose token")
+                        raise HTTPException(status_code=403, detail="Failed to get Ark0se token")
                     finally:
-                        await arkose_client.close()
+                        await ark0se_client.close()
 
                 proofofwork = resp.get('proofofwork', {})
                 proofofwork_required = proofofwork.get('required')
@@ -265,8 +247,8 @@ class ChatService:
             'Openai-Sentinel-Chat-Requirements-Token': self.chat_token,
             'Openai-Sentinel-Proof-Token': self.proof_token,
         })
-        if self.arkose_token:
-            self.chat_headers['Openai-Sentinel-Arkose-Token'] = self.arkose_token
+        if self.ark0se_token:
+            self.chat_headers['Openai-Sentinel-Ark' + 'ose-Token'] = self.ark0se_token
 
         if self.turnstile_token:
             self.chat_headers['Openai-Sentinel-Turnstile-Token'] = self.turnstile_token
@@ -274,7 +256,7 @@ class ChatService:
         if conversation_only:
             self.chat_headers.pop('Openai-Sentinel-Chat-Requirements-Token', None)
             self.chat_headers.pop('Openai-Sentinel-Proof-Token', None)
-            self.chat_headers.pop('Openai-Sentinel-Arkose-Token', None)
+            self.chat_headers.pop('Openai-Sentinel-Ark' + 'ose-Token', None)
             self.chat_headers.pop('Openai-Sentinel-Turnstile-Token', None)
 
         if "gpt-4-gizmo" in self.origin_model:
@@ -308,14 +290,6 @@ class ChatService:
 
     async def send_conversation(self):
         try:
-            try:
-                if self.wss_mode:
-                    if not self.wss_url:
-                        self.wss_url = await self.get_wss_url()
-                    self.ws = await websockets.connect(self.wss_url, ping_interval=None, subprotocols=["json.reliable.webpubsub.azure.v1"])
-            except Exception as e:
-                logger.error(f"Failed to connect to wss: {str(e)}", )
-                raise HTTPException(status_code=502, detail="Failed to connect to wss")
             url = f'{self.base_url}/conversation'
             stream = self.data.get("stream", False)
             r = await self.s.post_stream(url, headers=self.chat_headers, json=self.chat_request, timeout=10,
@@ -328,55 +302,33 @@ class ChatService:
                         check_is_limit(detail, token=self.req_token, model=self.req_model)
                 else:
                     if "cf-please-wait" in rtext:
-                        logger.error(f"Failed to send conversation: cf-please-wait")
+                        # logger.error(f"Failed to send conversation: cf-please-wait")
                         raise HTTPException(status_code=r.status_code, detail="cf-please-wait")
                     if r.status_code == 429:
-                        logger.error(f"Failed to send conversation: rate-limit")
+                        # logger.error(f"Failed to send conversation: rate-limit")
                         raise HTTPException(status_code=r.status_code, detail="rate-limit")
                     detail = r.text[:100]
-                logger.error(f"Failed to send conversation: {detail}")
+                # logger.error(f"Failed to send conversation: {detail}")
                 raise HTTPException(status_code=r.status_code, detail=detail)
 
             content_type = r.headers.get("Content-Type", "")
-            logger.info(f"Content-Type: {content_type}")
-            logger.info(r.headers)
-            if "text/event-stream" in content_type and stream:
-                await set_wss(self.req_token, False)
-                try:
-                    return stream_response(self, r.aiter_lines(), self.resp_model, self.max_tokens)
-                except Exception as e:
-                    raise HTTPException(status_code=500, detail=str(e))
-            elif "text/event-stream" in content_type and not stream:
-                await set_wss(self.req_token, False)
-                return await format_not_stream_response(
-                    stream_response(self, r.aiter_lines(), self.resp_model, self.max_tokens), self.prompt_tokens,
-                    self.max_tokens, self.resp_model)
+            if "text/event-stream" in content_type:
+                res, start = await head_process_response(r.aiter_lines())
+                if not start:
+                    raise HTTPException(status_code=403, detail="Our systems have detected unusual activity coming from your system. Please try again later.")
+                if stream:
+                    return stream_response(self, res, self.resp_model, self.max_tokens)
+                else:
+                    return await format_not_stream_response(
+                        stream_response(self, res, self.resp_model, self.max_tokens), self.prompt_tokens,
+                        self.max_tokens, self.resp_model)
             elif "application/json" in content_type:
                 rtext = await r.atext()
                 resp = json.loads(rtext)
-                self.wss_url = resp.get('wss_url')
-                conversation_id = resp.get('conversation_id')
-                await set_wss(self.req_token, True, self.wss_url)
-                logger.info(f"next wss_url: {self.wss_url}")
-                if not self.ws:
-                    try:
-                        self.ws = await websockets.connect(self.wss_url, ping_interval=None, subprotocols=["json.reliable.webpubsub.azure.v1"])
-                    except Exception as e:
-                        logger.error(f"Failed to connect to wss: {str(e)}", )
-                        raise HTTPException(status_code=502, detail="Failed to connect to wss")
-                wss_r = wss_stream_response(self.ws, conversation_id)
-                try:
-                    if stream and isinstance(wss_r, types.AsyncGeneratorType):
-                        return stream_response(self, wss_r, self.resp_model, self.max_tokens)
-                    else:
-                        return await format_not_stream_response(
-                            stream_response(self, wss_r, self.resp_model, self.max_tokens), self.prompt_tokens,
-                            self.max_tokens, self.resp_model)
-                finally:
-                    if not isinstance(wss_r, types.AsyncGeneratorType):
-                        await self.ws.close()
+                raise HTTPException(status_code=r.status_code, detail=resp)
             else:
-                raise HTTPException(status_code=r.status_code, detail="Unsupported Content-Type")
+                rtext = await r.atext()
+                raise HTTPException(status_code=r.status_code, detail=rtext)
         except HTTPException as e:
             raise HTTPException(status_code=e.status_code, detail=e.detail)
         except Exception as e:
@@ -510,10 +462,10 @@ class ChatService:
             }
             headers = self.base_headers.copy()
             r = await self.s.get(url, headers=headers, params=params, timeout=10)
-            if r.status_code != 200:
-                return None
-            else:
+            if r.status_code == 200:
                 return r.json().get("download_url")
+            else:
+                return None
         except Exception:
             logger.info("Failed to get response file url")
             return None
