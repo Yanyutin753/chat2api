@@ -439,10 +439,13 @@ class ChatService:
                     return file_meta
                 else:
                     logger.error("Failed to get download url")
+                    raise Exception("Failed to get download url")
             else:
                 logger.error("Failed to upload file")
+                raise Exception("Failed to upload file")
         else:
             logger.error("Failed to get upload url")
+            raise Exception("Failed to get upload url")
 
     async def check_upload(self, file_id):
         url = f'{self.base_url}/files/{file_id}'
