@@ -110,7 +110,13 @@ class ChatService:
     async def set_model(self):
         self.origin_model = self.data.get("model", "gpt-3.5-turbo-0125")
         self.resp_model = model_proxy.get(self.origin_model, self.origin_model)
-        if "gpt-4o-mini" in self.origin_model:
+        if "o1-preview" in self.origin_model:
+            self.req_model = "o1-preview"
+        elif "o1-mini" in self.origin_model:
+            self.req_model = "o1-mini"
+        elif "o1" in self.origin_model:
+            self.req_model = "o1"
+        elif "gpt-4o-mini" in self.origin_model:
             self.req_model = "gpt-4o-mini"
         elif "gpt-4o" in self.origin_model:
             self.req_model = "gpt-4o"
@@ -195,8 +201,9 @@ class ChatService:
                         )
                         r2esp = r2.json()
                         logger.info(f"ark0se_token: {r2esp}")
-                        self.ark0se_token = r2esp.get('token')
-                        if not self.ark0se_token:
+                        if r2esp.get('solved', True):
+                            self.ark0se_token = r2esp.get('token')
+                        else:
                             raise HTTPException(status_code=403, detail="Failed to get Ark0se token")
                     except Exception:
                         raise HTTPException(status_code=403, detail="Failed to get Ark0se token")
@@ -240,7 +247,7 @@ class ChatService:
             chat_messages, self.prompt_tokens = await api_messages_to_chat(self, self.api_messages, self.origin_model)
         except Exception as e:
             logger.error(f"Failed to format messages: {str(e)}")
-            raise HTTPException(status_code=400, detail="Failed to format messages.")
+            raise HTTPException(status_code=500, detail="Failed to format messages.")
         self.chat_headers = self.base_headers.copy()
         self.chat_headers.update({
             'Accept': 'text/event-stream',
@@ -432,10 +439,13 @@ class ChatService:
                     return file_meta
                 else:
                     logger.error("Failed to get download url")
+                    raise Exception("Failed to get download url")
             else:
                 logger.error("Failed to upload file")
+                raise Exception("Failed to upload file")
         else:
             logger.error("Failed to get upload url")
+            raise Exception("Failed to get upload url")
 
     async def check_upload(self, file_id):
         url = f'{self.base_url}/files/{file_id}'

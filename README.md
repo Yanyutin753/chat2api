@@ -4,13 +4,9 @@
 
 🌟 无需账号即可使用免费、无限的 `GPT-3.5`
 
-💥 支持 AccessToken 使用账号，支持 `GPT-4`、`GPT-4o/mini`、 `GPTs`
+💥 支持 AccessToken 使用账号，支持 `O1-Preview/mini`、`GPT-4`、`GPT-4o/mini`、 `GPTs`
 
 🔍 回复格式与真实 API 完全一致，适配几乎所有客户端
-
-## 赞助商
-
-感谢 Capsolver 对本项目的赞助，对于市面上任何人机验证码，你可以使用 [https://capsolver.com](https://capsolver.com/?utm_source=github&utm_medium=github_banner&utm_campaign=chat2api) 来解决
 
 ## 交流群
 
@@ -24,16 +20,23 @@
 2. 报错的日志信息（敏感信息打码）
 3. 接口返回的状态码和响应体
 
+## 赞助商
+
+感谢 Capsolver 对本项目的赞助，对于市面上任何人机验证码，你可以使用 [Capsolver](https://www.capsolver.com/zh?utm_source=github&utm_medium=repo&utm_campaign=scraping&utm_term=chat2api) 来解决
+
+[![Capsolver](docs/capsolver.png)](https://www.capsolver.com/zh?utm_source=github&utm_medium=repo&utm_campaign=scraping&utm_term=chat2api)
+
 ## 功能
 
-### 最新版 v1.4.4
+### 最新版 v1.4.7
 
 > 已完成
 > - [x] 流式、非流式传输
 > - [x] 免登录 GPT-3.5 对话
-> - [x] GPT-3.5 对话（传入模型名不包含 gpt-4，则默认使用 gpt-3.5，也就是 text-davinci-002-render-sha）
-> - [x] GPT-4 对话（传入模型名包含: gpt-4，gpt-4o，gpt-4o-mini，gpt-4-moblie 即可使用对应模型，需传入 AccessToken）
-> - [x] GPT-4 画图、代码、联网
+> - [x] GPT-3.5 模型对话（传入模型名不包含 gpt-4，则默认使用 gpt-3.5，也就是 text-davinci-002-render-sha）
+> - [x] GPT-4 系列模型对话（传入模型名包含: gpt-4，gpt-4o，gpt-4o-mini，gpt-4-moblie 即可使用对应模型，需传入 AccessToken）
+> - [x] O1 系列模型对话（传入模型名包含 o1-preview，o1-mini 即可使用对应模型，需传入 AccessToken）
+> - [x] GPT-4 模型画图、代码、联网
 > - [x] 支持 GPTs（传入模型名：gpt-4-gizmo-g-*）
 > - [x] 支持 Team Plus 账号（需传入 team account id）
 > - [x] 上传图片、文件（格式为 API 对应格式，支持 URL 和 base64）
@@ -71,6 +74,7 @@
 |      | PROXY_URL         | `http://ip:port`,<br/>`http://username:password@ip:port`    | `[]`                  | 全局代理 URL，出 403 时启用，多个代理用逗号分隔                                 |
 |      | EXPORT_PROXY_URL  | `http://ip:port`或<br/>`http://username:password@ip:port`    | `None`                | 出口代理 URL，防止请求图片和文件时泄漏源站 ip                                   |
 |      | ARK0SE_TOKEN_URL  | `https://example.com/token`                                 | `[]`                  | 获取 Ark0se token 的地址                                          |
+|      | USER_AGENTS       | `["ua1", "ua2"]`                                            | `[]`                  | 设置随机使用的 UserAgent 列表（可降低风控），不设置则使用默认的 Chrome 浏览器对应UA         |
 | 功能相关 | HISTORY_DISABLED  | `true`                                                      | `true`                | 是否不保存聊天记录并返回 conversation_id                                 |
 |      | POW_DIFFICULTY    | `00003a`                                                    | `00003a`              | 要解决的工作量证明难度，不懂别设置                                            |
 |      | RETRY_TIMES       | `3`                                                         | `3`                   | 出错重试次数，使用 AUTHORIZATION 会自动轮询下一个账号                           |
@@ -80,7 +84,6 @@
 |      | UPLOAD_BY_URL     | `false`                                                     | `false`               | 开启后按照 `URL+空格+正文` 进行对话，自动解析 URL 内容并上传，多个 URL 用空格分隔           |
 |      | CHECK_MODEL       | `false`                                                     | `false`               | 检查账号是否支持传入模型，开启后可以稍微避免4o返回3.5内容，但是会增加请求时延，且并不能解决降智问题         |
 |      | SCHEDULED_REFRESH | `false`                                                     | `false`               | 是否定时刷新 AccessToken ，开启后每次启动程序将会全部非强制刷新一次，每4天晚上3点全部强制刷新一次。    |
-|      | USER_AGENTS       | `["ua1", "ua2"]`                                            | `[]`                  | 随机使用的 UserAgent 列表，不设置则使用默认的 Edge 浏览器对应UA                    |
 ## 部署
 
 ### Zeabur 部署
