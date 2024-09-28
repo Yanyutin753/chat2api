@@ -401,7 +401,7 @@ async def api_messages_to_chat(service, api_messages, ori_model_name):
                                 "height": height
                             })
                         else:
-                            if not use_case == "ace_upload":
+                            if use_case == "my_files":
                                 await service.check_upload(file_id)
                             file_tokens += file_size // 1000
                             attachments.append({
